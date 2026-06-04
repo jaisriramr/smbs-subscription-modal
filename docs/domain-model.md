@@ -4,7 +4,9 @@
 
 The SMB Subscription Platform is a multi-tenant SaaS application that enables merchants to create subscription plans, onboard customers, manage recurring subscriptions, and process subscription payments.
 
-The domain model defines the core business entities and their relationships.
+The platform is intentionally designed as an MVP focused on subscription lifecycle management, tenant isolation, payment processing, and recurring billing automation.
+
+The domain model defines the core business entities, ownership boundaries, and business rules.
 
 ---
 
@@ -22,6 +24,7 @@ Examples:
 * Yoga Center
 * Coaching Institute
 * Milk Delivery Service
+* Water Delivery Service
 
 ### Responsibilities
 
@@ -29,7 +32,7 @@ Examples:
 * Creates subscription plans
 * Manages customers
 * Manages subscriptions
-* Views payment activity
+* Monitors payment activity
 
 ### Business Rules
 
@@ -55,7 +58,7 @@ Examples:
 
 ### Responsibilities
 
-* Access platform features
+* Access platform functionality
 * Manage customers
 * Manage plans
 * Manage subscriptions
@@ -72,6 +75,10 @@ Examples:
 ### Description
 
 Represents a subscription offering created by a Tenant.
+
+The platform does not support Product Catalog Management.
+
+Plans are the primary offerings exposed by a Tenant.
 
 Examples:
 
@@ -106,7 +113,7 @@ Examples:
 
 ### Description
 
-Represents an end customer who subscribes to a Tenant's plans.
+Represents an end customer subscribing to a Tenant's plan.
 
 Examples:
 
@@ -118,13 +125,31 @@ Examples:
 
 * Subscribe to plans
 * Make payments
-* Maintain active subscriptions
+* Maintain subscription relationship
 
 ### Business Rules
 
 * A Customer belongs to exactly one Tenant.
-* A Customer can have multiple Subscriptions.
+* A Customer can have only one Subscription within a Tenant.
 * A Customer cannot belong to multiple Tenants.
+* A real-world individual may exist as a Customer in multiple Tenants.
+* Customers are never shared across Tenants.
+
+### Example
+
+CultFit
+
+* Ravi
+
+UFC Gym
+
+* Ravi
+
+Yoga Center
+
+* Ravi
+
+The above records represent three independent customer records belonging to different Tenants.
 
 ### Attributes
 
@@ -139,15 +164,15 @@ Examples:
 
 ### Description
 
-Represents an agreement between a Customer and a Plan.
+Represents the agreement between a Customer and a Plan.
 
-The Subscription entity is the core business entity within the platform.
+The Subscription entity is the primary business entity within the platform and acts as the aggregate root for billing and renewal workflows.
 
 ### Responsibilities
 
 * Track subscription lifecycle
-* Track renewal schedules
 * Track billing status
+* Track renewal schedule
 * Maintain subscription state
 
 ### Business Rules
@@ -157,18 +182,15 @@ The Subscription entity is the core business entity within the platform.
 * A Subscription belongs to one Tenant.
 * A Subscription must have a successful payment before activation.
 * A Subscription can have multiple Payment attempts.
+* A Customer can have only one Subscription within a Tenant.
 
 ### Subscription States
 
-PENDING
-
-ACTIVE
-
-PAST_DUE
-
-CANCELLED
-
-EXPIRED
+* PENDING
+* ACTIVE
+* PAST_DUE
+* CANCELLED
+* EXPIRED
 
 ### State Transitions
 
@@ -201,7 +223,7 @@ ACTIVE
 
 ### Description
 
-Represents a payment attempt associated with a subscription.
+Represents a payment attempt associated with a Subscription.
 
 ### Responsibilities
 
@@ -215,17 +237,13 @@ Represents a payment attempt associated with a subscription.
 * A Payment belongs to one Subscription.
 * A Payment belongs to one Tenant.
 * A Payment cannot be modified after completion.
-* Every payment must have a status.
+* Every Payment must have a status.
 
 ### Payment States
 
-PENDING
-
-SUCCESS
-
-FAILED
-
-REFUNDED
+* PENDING
+* SUCCESS
+* FAILED
 
 ### Attributes
 
@@ -247,7 +265,7 @@ Examples:
 
 * payment.success
 * payment.failed
-* payment.refunded
+* subscription.renewed
 
 ### Responsibilities
 
@@ -259,7 +277,7 @@ Examples:
 
 * Every event must be uniquely identifiable.
 * An event can only be processed once.
-* Events must be stored before processing.
+* Events must be persisted before processing.
 
 ### Attributes
 
@@ -272,66 +290,84 @@ Examples:
 ---
 
 # Domain Relationships
+
 ```
 Tenant
 ├── Users
 ├── Plans
 ├── Customers
-├── Subscriptions
-└── Payments
+└── Subscriptions
 
 Customer
-└── Subscriptions
+└── Subscription
 
 Plan
-└── Subscriptions
+└── Subscription
 
 Subscription
 └── Payments
 
 Payment
-└── Webhook Events
+└── WebhookEvents
 ```
 
 ---
 
 # Aggregate Boundaries
 
-The following aggregates are identified:
-
 ## Tenant Aggregate
 
-Root Entity:
+Root Entity
 
 * Tenant
 
-Contains:
+Contains
 
 * Users
 * Plans
 * Customers
 
-Purpose:
+Purpose
 
-* Tenant ownership and isolation.
+* Tenant ownership
+* Tenant isolation
+* Access control
 
 ---
 
 ## Subscription Aggregate
 
-Root Entity:
+Root Entity
 
 * Subscription
 
-Contains:
+Contains
 
 * Payments
 
-Purpose:
+References
 
-* Subscription lifecycle management.
-* Billing management.
-* Renewal processing.
+* Customer
+* Plan
+
+Purpose
+
+* Subscription lifecycle management
+* Billing management
+* Renewal processing
+
+---
+
+# MVP Constraints
+
+1. Product Catalog Management is not supported.
+2. Customers are tenant-scoped.
+3. Customers are never shared across Tenants.
+4. A Customer can have only one Subscription within a Tenant.
+5. One Subscription maps to exactly one Plan.
+6. Subscription activation requires successful payment confirmation.
+7. Payment processing is webhook-driven.
+8. Tenant isolation is enforced across all business entities.
 
 ---
 
@@ -342,3 +378,5 @@ Purpose:
 3. Payment events must be processed idempotently.
 4. Subscription activation requires successful payment confirmation.
 5. All business entities must be tenant-aware.
+6. Webhook events must be persisted before processing.
+7. Business operations must remain stateless at the application layer.
